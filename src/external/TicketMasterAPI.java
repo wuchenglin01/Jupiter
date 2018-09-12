@@ -4,9 +4,17 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.List;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
+
+import entity.Item;
+import entity.Item.ItemBuilder;
 
 public class TicketMasterAPI {
 	private static final String URL = "https://app.ticketmaster.com/discovery/v2/events.json";
@@ -20,7 +28,7 @@ public class TicketMasterAPI {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		String geoHash = GeoHash.encodeGeohash(lat, lon, 9);
+		String geoHash = GeoHash.encodeGeohash(lat, lon, 8);
 		String query = String.format("apikey=%s&geoPoint=%s&keyword=%s&radius=%s", API_KEY, geoHash, keyword, 50);
 		
 		try {
@@ -50,6 +58,111 @@ public class TicketMasterAPI {
 		}
 		return new JSONArray();
 	}
+	
+	private String getAddress(JSONObject event) throws JSONException {
+		if (!event.isNull("_embedded")) {
+			JSONObject embedded = event.getJSONObject("_embedded");
+			if (!embedded.isNull("venues")) {
+				JSONArray venues = embedded.getJSONArray("venues");
+				if (venues.length() > 0) {
+					JSONObject venue = venues.getJSONObject(0);
+					StringBuilder sb = new StringBuilder();
+					
+					if (!venue.isNull("address")) {
+						JSONObject address = venue.getJSONObject("address");
+						if (!address.isNull("line1")) {
+							sb.append(address.getString("line1"));
+							sb.append("\n");
+						}
+						if (!address.isNull("line2")) {
+							sb.append(address.getString("line2"));
+							sb.append("\n");
+						}
+						if (!address.isNull("line3")) {
+							sb.append(address.getString("line3"));
+						}
+						sb.append(", ");
+					}
+					if (!venue.isNull("city")) {
+						JSONObject city = venue.getJSONObject("city");
+						if (!city.isNull("name")) {
+							sb.append(city.getString("name"));
+						}
+					}
+					return sb.toString();
+				}
+			}
+		}	
+		return null;
+	}
+
+
+	// {"images": [{"url": "www.example.com/my_image.jpg"}, ...]}
+	private String getImageUrl(JSONObject event) throws JSONException {
+		if (!event.isNull("images")) {
+			JSONArray array = event.getJSONArray("images");
+			for (int i = 0; i < array.length(); i++) {
+				JSONObject image = array.getJSONObject(i);
+				if (!image.isNull("url")) {
+					return image.getString("url");
+				}
+			}
+		}
+		return null;
+	}
+
+	// {"classifications" : [{"segment": {"name": "music"}}, ...]}
+	private Set<String> getCategories(JSONObject event) throws JSONException {
+		Set<String> categories = new HashSet<>();
+		if (!event.isNull("classifications")) {
+			JSONArray classifications = event.getJSONArray("classifications");
+			for (int i = 0; i < classifications.length(); i++) {
+				JSONObject classification = classifications.getJSONObject(i);
+				if (!classification.isNull("segment")) {
+					JSONObject segment = classification.getJSONObject("segment");
+					if (!segment.isNull("name")) {
+						String name = segment.getString("name");
+						categories.add(name);
+					}
+				}
+			}
+		}
+		return categories;
+	}
+
+	// Convert JSONArray to a list of item objects.
+	private List<Item> getItemList(JSONArray events) throws JSONException {
+		List<Item> itemList = new ArrayList<>();
+		for (int i = 0; i < events.length(); ++i) {
+			JSONObject event = events.getJSONObject(i);
+			
+			ItemBuilder builder = new ItemBuilder();
+			if (!event.isNull("name")) {
+				builder.setName(event.getString("name"));
+			}
+			if (!event.isNull("id")) {
+				builder.setItemId(event.getString("id"));
+			}
+			if (!event.isNull("url")) {
+				builder.setUrl(event.getString("url"));
+			}
+			if (!event.isNull("rating")) {
+				builder.setRating(event.getDouble("rating"));
+			}
+			if (!event.isNull("distance")) {
+				builder.setDistance(event.getDouble("distance"));
+			}
+			
+			builder.setCategories(getCategories(event));
+			builder.setImageUrl(getImageUrl(event));
+			builder.setAddress(getAddress(event));
+			
+			Item item = builder.build();
+			itemList.add(item);
+		}
+		return itemList;
+	}
+
 	private void queryAPI(double lat, double lon) {
 		JSONArray events = search(lat, lon, null);
 		try {
@@ -71,5 +184,4 @@ public class TicketMasterAPI {
 		// Houston, TX
 		tmApi.queryAPI(29.682684, -95.295410);
 	}
-
 }
