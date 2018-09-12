@@ -21,7 +21,7 @@ public class TicketMasterAPI {
 	private static final String DEFAULT_KEYWORD = ""; // no restriction
 	private static final String API_KEY = "8iRQBiJZkAEq3Ppz9xTrLSEYwoGfzl0x";
 	
-	public JSONArray search(double lat, double lon, String keyword) {
+	public List<Item> search(double lat, double lon, String keyword) {
 		if (keyword == null) keyword = DEFAULT_KEYWORD;
 		try {
 			keyword = java.net.URLEncoder.encode(keyword, "UTF-8");
@@ -48,15 +48,15 @@ public class TicketMasterAPI {
 			
 			JSONObject obj = new JSONObject(response.toString());
 			if (obj.isNull("_embedded")) {
-				return new JSONArray();
+				return new ArrayList<Item>();
 			}
 			JSONObject embedded = obj.getJSONObject("_embedded");
 			JSONArray events = embedded.getJSONArray("events");
-			return events;
+			return getItemList(events);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return new JSONArray();
+		return new ArrayList<Item>();
 	}
 	
 	private String getAddress(JSONObject event) throws JSONException {
@@ -164,11 +164,11 @@ public class TicketMasterAPI {
 	}
 
 	private void queryAPI(double lat, double lon) {
-		JSONArray events = search(lat, lon, null);
+		List<Item> events = search(lat, lon, null);
 		try {
-		    for (int i = 0; i < events.length(); i++) {
-		        JSONObject event = events.getJSONObject(i);
-		        System.out.println(event);
+		    for (Item event : events) {
+		    	JSONObject obj = event.toJSONObject();
+		        System.out.println(obj);
 		    }
 		} catch (Exception e) {
 			e.printStackTrace();
