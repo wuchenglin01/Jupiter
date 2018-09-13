@@ -1,7 +1,7 @@
 package rpc;
 
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.util.List;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -9,8 +9,11 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.json.JSONArray;
+
+
+import entity.Item;
+import external.TicketMasterAPI;
 
 /**
  * Servlet implementation class SearchItem
@@ -34,21 +37,20 @@ public class SearchItem extends HttpServlet {
 		response.setContentType("application/json");
 		response.addHeader("Access-Control-Allow-Origin", "*");
 		
-		String username = "";
-		if (request.getParameter("username") != null) {
-			username = request.getParameter("username");
-		}
-		JSONObject obj = new JSONObject();
-		try {
-			obj.put("username", username);
-		}catch (JSONException e) {
-			e.printStackTrace();
+		double lat = Double.parseDouble(request.getParameter("lat"));
+		double lon = Double.parseDouble(request.getParameter("lon"));
+		String term = request.getParameter("term");
+		
+		TicketMasterAPI tmAPI = new TicketMasterAPI();
+		List<Item> items = tmAPI.search(lat, lon, term);
+		
+		JSONArray array = new JSONArray();
+		
+		for (Item item : items) {
+			array.put(item.toJSONObject());
 		}
 		
-		PrintWriter out = response.getWriter();
-		out.print(obj);
-		out.close();
-		
+		RpcHelper.writeJsonArray(response, array);
 	}
 
 	/**
